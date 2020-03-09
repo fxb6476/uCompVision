@@ -10,6 +10,9 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
+using namespace cv;
+using namespace std;
+
 uint8_t *buffer;
  
 static int xioctl(int fd, int request, void *arg)
@@ -136,7 +139,7 @@ int init_mmap(int fd)
         return 1;
     }
  
-    buffer = mmap (NULL, buf.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buf.m.offset);
+    buffer = (unit8_t *)mmap(NULL, buf.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buf.m.offset);
     printf("Length: %d\nAddress: %p\n", buf.length, buffer);
     printf("Image Length: %d\n", buf.bytesused);
  
@@ -179,7 +182,7 @@ int capture_image(int fd)
         return 1;
     }
     printf ("saving image\n");
-    
+
     IplImage* frame;
     CvMat cvmat = cvMat(480, 640, CV_8UC3, (void*)buffer);
     frame = cvDecodeImage(&cvmat, 1);
