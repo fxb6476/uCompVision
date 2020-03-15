@@ -406,7 +406,7 @@ static void usage(FILE *fp, int argc, char **argv)
                  argv[0], dev_name, frame_count);
 }
 
-static const char short_options[] = "dc:hmof";
+static const char short_options[] = "d:hmofc:";
 
 static const struct option
 long_options[] = {
