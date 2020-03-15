@@ -17,8 +17,8 @@ int main(){
     return -1;
   }
 
-  cap.set(CAP_PROP_FRAME_WIDTH,640);
-  cap.set(CAP_PROP_FRAME_HEIGHT,480);
+  cap.set(CAP_PROP_FRAME_WIDTH,3264);
+  cap.set(CAP_PROP_FRAME_HEIGHT,2448);
 
   for(int i = 0; i < 10; i++){
 
@@ -30,11 +30,8 @@ int main(){
     if (frame.empty())
       break;
 
-    // Wait 1 second before writing frame...
-    usleep(1000000);
-
     // Writting frame to file...
-    imwrite("/stream/pic.png", frame);
+    imwrite("/stream/pic.jpg", frame);
   }
 
   // When everything done, release the video capture object
