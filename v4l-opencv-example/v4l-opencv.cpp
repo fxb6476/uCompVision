@@ -17,6 +17,7 @@ int main(){
     return -1;
   }
 
+  // Testing shtoofs
   cap.set(CAP_PROP_FOURCC, VideoWriter::fourcc('M', 'J', 'P', 'G'))
   cap.set(CAP_PROP_FRAME_WIDTH,3264);
   cap.set(CAP_PROP_FRAME_HEIGHT,2448);
