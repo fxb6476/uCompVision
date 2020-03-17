@@ -84,6 +84,7 @@ static void process_image(void *img, int size)
     // Now we are only going to decompress the desired width and height.
     // Aka cropping during decompressing?
     // Janky croping of raw RGB data ;) frek opencv  hehe...
+    int pixel_size = cinfo.output_components;
     int width = 640;
     int height = 480;
     int cent_x = pic_width / 2;
@@ -143,12 +144,11 @@ static void process_image(void *img, int size)
 
     // Moment of truth, turning this into a Mat object for opencv processing...
     Mat good_img;
-    Mat imgbuf(d_height, d_width, CV_8UC3, (void *)crop_buf);
+    Mat imgbuf(height, width, CV_8UC3, (void *)bmp_buffer);
     cvtColor(imgbuf, good_img, COLOR_RGB2BGR);
 
     imwrite("/stream/pic.jpg", good_img);
 
-    free(crop_buf);
     free(bmp_buffer);
 }
 
