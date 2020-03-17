@@ -9,6 +9,7 @@
 
 #include <opencv2/opencv.hpp>
 #include <time.h>
+#include <fstream>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,6 +29,7 @@
 
 #include <linux/videodev2.h>
 #include "utils.h"
+#include <jpeglib.h>
 
 using namespace std;
 using namespace cv;
@@ -40,8 +42,8 @@ static unsigned int     n_buffers;
 static int              out_buf;
 static int              force_format;
 static int              frame_count = 70;
-static int 		        pic_height = 2448;
-static int 		        pic_width = 3264;
+static int 		        pic_height = 1080;
+static int 		        pic_width = 1920;
 
 static void process_image(void *img, int size)
 {
@@ -53,44 +55,96 @@ static void process_image(void *img, int size)
     fprintf(stderr, ".");
     fflush(stdout);
 
-	// Crop image before reading it...
-	int height = 720;
-	int width = 1280;
-	int start_x = (pic_width / 2) - (width / 2);
-	int end_x = (pic_width / 2) + (width / 2);
-	int start_y = (pic_height / 2) - (height / 2);
-	int end_y = (pic_height / 2) + (height / 2);
+    //ofstream outfile ("/stream/pic.jpg", ofstream::binary);
+    //outfile.write((char *)img, size);
+    //outfile.close();
 
-	void *crop;
-	int crop_size = width * height;
+    // Trying to use libjpeg to decompress mjpeg. See whats better, libjpeg or opencv -.-
+    struct jpeg_decompress_struct cinfo;
+    struct jpeg_error_mgr jerr;
+    int rc;
 
-	// Putting only data that falls within crop bounds!
+    // Some error handling?
+    cinfo.err = jpeg_std_error(&jerr);
 
-	// Create a Size(1, nSize) Mat object of 8-bit, single-byte elements
-	Mat rawData (1, size, CV_8UC1, img);
+    // Creating object and setting memory in structure...
+    jpeg_create_decompress(&cinfo);
+    jpeg_mem_src(&cinfo, (unsigned char *)img, size);
 
-	Mat decimg  =  imdecode(rawData, IMREAD_COLOR);
-	if ( decimg.data == NULL ){
-    		printf("Error Reading raw image!!!");
-	}
+    // Checking if it is a readl jpeg file... Should work?
+    rc = jpeg_read_header(&cinfo, TRUE);
 
-	/*
-	// Just some opencv post processing for funzies...
-	// Ignore until we can turn raw image data into jpeg file faster lol
+    if (rc != 1) {
+        printf("File does not seem to be a normal JPEG\n");
+    }
 
-    Mat crop;
+    // Starting the decompression...
+    jpeg_start_decompress(&cinfo);
 
-    decimg(Rect(start_x,start_y,width,height)).copyTo(crop);
+    int width = cinfo.output_width;
+    int height = cinfo.output_height;
+    int pixel_size = cinfo.output_components;
+    printf("Proc: Image is %d by %d with %d components\n", width, height, pixel_size);
 
+    // Getting buffer ready to read data...
+    unsigned long bmp_size;
+    unsigned char *bmp_buffer;
+    bmp_size = width * height * pixel_size;
+    bmp_buffer = (unsigned char*) malloc(bmp_size);
+    int row_stride = width * pixel_size; // Bytes required to fill an entire row...
 
-    Mat gray, edge, draw;
-    cvtColor(decimg, gray, COLOR_BGR2GRAY);
+    // Now we are going to read decompressed raw RGB data into buffer...
+    while (cinfo.output_scanline < cinfo.output_height) {
+        unsigned char *buffer_array[1];
+	buffer_array[0] = bmp_buffer + (cinfo.output_scanline) * row_stride;
+        jpeg_read_scanlines(&cinfo, buffer_array, 1);
+    }
 
-    Canny( gray, edge, 50, 150, 3);
+    // All done reading!! Time to destroy allocated buffers and what not...
+    jpeg_finish_decompress(&cinfo);
+    jpeg_destroy_decompress(&cinfo);
 
-    edge.convertTo(draw, CV_8U);
-    imwrite("/stream/pic.jpg", gray);
-	*/
+    // Janky croping of raw RGB data ;) frek opencv  hehe...
+    int d_width = 1920;
+    int d_height = 1080;
+    int cent_x = pic_width / 2;
+    int cent_y = pic_height / 2;
+    int min_width = cent_x - (d_width / 2);
+    int max_width = cent_x + (d_width / 2);
+    int min_height = cent_y - (d_height / 2);
+    int max_height = cent_y + (d_height / 2);
+    int tot_width = max_width - min_width;
+    int tot_height = max_height - min_height;
+
+    printf("Center -> (%d, %d) :Checking row (%d) and col (%d) size, %d, %d, %d, %d\n", cent_x, cent_y, tot_width, tot_height, min_width, max_width, min_height, max_height);
+
+    unsigned long crop_size;
+    unsigned char *crop_buf;
+    crop_size = d_width * d_height * pixel_size;
+    crop_buf = (unsigned char*) malloc(crop_size);
+
+    int buf_cnt = 0;
+    for( int row = min_height; row < max_height; row++){
+        for( int col = min_width; col < max_width; col++){
+	    //printf("%d, ", col);
+	    // Getting the R, G, and B values for each desired pixel ;)
+	    crop_buf[buf_cnt]     = bmp_buffer[ (row_stride * row)  + col];
+	    crop_buf[buf_cnt + 1] = bmp_buffer[ (row_stride * row)  + col + 1];
+	    crop_buf[buf_cnt + 2] = bmp_buffer[ (row_stride * row)  + col + 2];
+            buf_cnt = buf_cnt + 3;
+        }
+        //printf("\n");
+    }
+
+    // Moment of truth, turning this into a Mat object for opencv processing...
+    Mat good_img;
+    Mat imgbuf(d_height, d_width, CV_8UC3, (void *)crop_buf);
+    cvtColor(imgbuf, good_img, COLOR_RGB2BGR);
+
+    imwrite("/stream/pic.jpg", good_img);
+
+    free(crop_buf);
+    free(bmp_buffer);
 }
 
 static int read_frame(void)
@@ -164,7 +218,7 @@ static void mainloop(void)
                         /* EAGAIN - continue select loop. */
                 }
 		        // Delay 40 milliseconds makes 25fps
-		        //delay(40);
+		        // delay(10);
         }
 }
 
