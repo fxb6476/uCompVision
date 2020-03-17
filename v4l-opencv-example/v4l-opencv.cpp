@@ -9,7 +9,7 @@ int main(){
 
     // Create a VideoCapture object and open the input file
     // If the input is the web camera, pass 0 instead of the video file name
-    VideoCapture cap(0, CAP_DSHOW);
+    VideoCapture cap = VideoCapture("/dev/video0", CAP_V4L2);
 
     // Check if camera opened successfully
     if(!cap.isOpened()){
@@ -25,12 +25,12 @@ int main(){
     cap.set(CAP_PROP_FRAME_WIDTH,cap_width);
     cap.set(CAP_PROP_FRAME_HEIGHT,cap_height);
 
-    for(int i = 0; i < 10; i++){
+    for(int i = 0; i < 1000; i++){
 
-        printf("Getting image...\n");
+        printf("Got image...\n");
         Mat frame, crop;
         // Capture frame-by-frame
-        cap >> frame;
+        cap.read(frame);
 
         // If the frame is empty, break immediately
         if (frame.empty()) {
@@ -39,17 +39,18 @@ int main(){
         }
 
         // Crop image before reading it...
-        int height = 480;
-        int width = 640;
+        int height = 1000;
+        int width = 1000;
         int start_x = (cap_width / 2) - (width / 2);
         int start_y = (cap_height / 2) - (height / 2);
 
         frame(Rect(start_x,start_y,width,height)).copyTo(crop);
 
+	usleep(40 * 1000);
 
-        printf("Writing cropped image...\n");
+        //printf("Writing cropped image...\n");
         // Writting frame to file...
-        imwrite("/stream/pic.jpg", crop);
+        //imwrite("/stream/pic.jpg", crop);
     }
 
     // When everything done, release the video capture object
