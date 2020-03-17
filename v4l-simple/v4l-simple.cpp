@@ -81,10 +81,25 @@ static void process_image(void *img, int size)
     // Starting the decompression...
     jpeg_start_decompress(&cinfo);
 
-    int width = cinfo.output_width;
-    int height = cinfo.output_height;
-    int pixel_size = cinfo.output_components;
-    printf("Proc: Image is %d by %d with %d components\n", width, height, pixel_size);
+    // Now we are only going to decompress the desired width and height.
+    // Aka cropping during decompressing?
+    // Janky croping of raw RGB data ;) frek opencv  hehe...
+    int width = 640;
+    int height = 480;
+    int cent_x = pic_width / 2;
+    int cent_y = pic_height / 2;
+    int min_width = cent_x - (width / 2);
+    int min_height = cent_y - (height / 2);
+    int max_height = cent_y + (height / 2);
+
+    // Setting cropping dimensions before we start reading the decompressed data...
+    printf("Cropped image is %d by %d with %d components\n", width, height, 3);
+    JDIMENSION jpg_offset = min_width;
+    JDIMENSION jpg_width = width;
+    JDIMENSION skip_lines = min_height;
+
+    jpeg_crop_scanline (&cinfo, &jpg_offset, &jpg_width);
+    jpeg_skip_scanlines(&cinfo, skip_lines);
 
     // Getting buffer ready to read data...
     unsigned long bmp_size;
@@ -94,9 +109,9 @@ static void process_image(void *img, int size)
     int row_stride = width * pixel_size; // Bytes required to fill an entire row...
 
     // Now we are going to read decompressed raw RGB data into buffer...
-    while (cinfo.output_scanline < cinfo.output_height) {
+    while (cinfo.output_scanline < max_height) {
         unsigned char *buffer_array[1];
-	buffer_array[0] = bmp_buffer + (cinfo.output_scanline) * row_stride;
+	    buffer_array[0] = bmp_buffer + (cinfo.output_scanline) * row_stride;
         jpeg_read_scanlines(&cinfo, buffer_array, 1);
     }
 
@@ -104,18 +119,7 @@ static void process_image(void *img, int size)
     jpeg_finish_decompress(&cinfo);
     jpeg_destroy_decompress(&cinfo);
 
-    // Janky croping of raw RGB data ;) frek opencv  hehe...
-    int d_width = 1920;
-    int d_height = 1080;
-    int cent_x = pic_width / 2;
-    int cent_y = pic_height / 2;
-    int min_width = cent_x - (d_width / 2);
-    int max_width = cent_x + (d_width / 2);
-    int min_height = cent_y - (d_height / 2);
-    int max_height = cent_y + (d_height / 2);
-    int tot_width = max_width - min_width;
-    int tot_height = max_height - min_height;
-
+    /*
     printf("Center -> (%d, %d) :Checking row (%d) and col (%d) size, %d, %d, %d, %d\n", cent_x, cent_y, tot_width, tot_height, min_width, max_width, min_height, max_height);
 
     unsigned long crop_size;
@@ -135,6 +139,7 @@ static void process_image(void *img, int size)
         }
         //printf("\n");
     }
+    */
 
     // Moment of truth, turning this into a Mat object for opencv processing...
     Mat good_img;
